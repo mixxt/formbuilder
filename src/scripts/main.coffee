@@ -1,4 +1,4 @@
-class FormbuilderModel extends Backbone.DeepModel
+class @FormbuilderModel extends Backbone.DeepModel
   sync: -> # noop
   indexInDOM: ->
     $wrapper = $(".fb-field-wrapper").filter ( (_, el) => $(el).data('cid') == @cid  )
@@ -7,7 +7,7 @@ class FormbuilderModel extends Backbone.DeepModel
     Formbuilder.inputFields[@get(Formbuilder.options.mappings.FIELD_TYPE)]?
 
 
-class FormbuilderCollection extends Backbone.Collection
+class @FormbuilderCollection extends Backbone.Collection
   initialize: ->
     @on 'add', @copyCidToModel
 
@@ -20,7 +20,7 @@ class FormbuilderCollection extends Backbone.Collection
     model.attributes.cid = model.cid
 
 
-class ViewFieldView extends Backbone.View
+class @ViewFieldView extends Backbone.View
   className: "fb-field-wrapper"
 
   events:
@@ -54,7 +54,7 @@ class ViewFieldView extends Backbone.View
     @parentView.createField attrs, { position: @model.indexInDOM() + 1 }
 
 
-class EditFieldView extends Backbone.View
+class @EditFieldView extends Backbone.View
   className: "edit-response-field"
 
   events:
@@ -114,7 +114,7 @@ class EditFieldView extends Backbone.View
     @model.trigger('change')
 
 
-class BuilderView extends Backbone.View
+class @BuilderView extends Backbone.View
   SUBVIEWS: []
 
   events:
@@ -338,7 +338,7 @@ class BuilderView extends Backbone.View
         @updatingBatch = undefined
 
 
-class Formbuilder
+class @Formbuilder
   @helpers:
     defaultFieldAttrs: (field_type) ->
       attrs =
@@ -402,9 +402,9 @@ class Formbuilder
     args = _.extend opts, {formBuilder: @}
     @mainView = new BuilderView args
 
-window.Formbuilder = Formbuilder
+#window.Formbuilder = Formbuilder
 
-if module?
-  module.exports = Formbuilder
-else
-  window.Formbuilder = Formbuilder
+#if module?
+#  module.exports = Formbuilder
+#else
+#  window.Formbuilder = Formbuilder
