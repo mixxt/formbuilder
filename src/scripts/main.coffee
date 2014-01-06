@@ -1,4 +1,72 @@
-class @FormbuilderModel extends Backbone.DeepModel
+# Main namespace
+# Constructor delegates to Formbuilder.BuilderView
+class Formbuilder
+  @helpers:
+    defaultFieldAttrs: (field_type) ->
+      attrs =
+        label: "Untitled"
+        field_type: field_type
+        required: true
+        field_options: {}
+
+      Formbuilder.fields[field_type].defaultAttributes?(attrs) || attrs
+
+    simple_format: (x) ->
+      x?.replace(/\n/g, '<br />')
+
+  @options:
+    BUTTON_CLASS: 'fb-button'
+    HTTP_ENDPOINT: ''
+    HTTP_METHOD: 'POST'
+
+    mappings:
+      SIZE: 'field_options.size'
+      UNITS: 'field_options.units'
+      LABEL: 'label'
+      FIELD_TYPE: 'field_type'
+      REQUIRED: 'required'
+      ADMIN_ONLY: 'admin_only'
+      OPTIONS: 'field_options.options'
+      DESCRIPTION: 'field_options.description'
+      INCLUDE_OTHER: 'field_options.include_other_option'
+      INCLUDE_BLANK: 'field_options.include_blank_option'
+      INTEGER_ONLY: 'field_options.integer_only'
+      MIN: 'field_options.min'
+      MAX: 'field_options.max'
+      MINLENGTH: 'field_options.minlength'
+      MAXLENGTH: 'field_options.maxlength'
+      LENGTH_UNITS: 'field_options.min_max_length_units'
+
+    dict:
+      ALL_CHANGES_SAVED: 'All changes saved'
+      SAVE_FORM: 'Save form'
+      UNSAVED_CHANGES: 'You have unsaved changes. If you leave this page, you will lose those changes!'
+
+  @fields: {}
+  @inputFields: {}
+  @nonInputFields: {}
+
+  @registerField: (name, opts) ->
+    for x in ['view', 'edit']
+      opts[x] = _.template(opts[x])
+
+    opts.field_type = name
+
+    Formbuilder.fields[name] = opts
+
+    if opts.type == 'non_input'
+      Formbuilder.nonInputFields[name] = opts
+    else
+      Formbuilder.inputFields[name] = opts
+
+  constructor: (selectorOrOptions)->
+    if _.isString(selectorOrOptions)
+      view = new Formbuilder.BuilderView(el: selectorOrOptions)
+    else
+      view = new Formbuilder.BuilderView(selectorOrOptions)
+    view.render()
+
+class FormbuilderModel extends Backbone.DeepModel
   sync: -> # noop
   indexInDOM: ->
     $wrapper = $(".fb-field-wrapper").filter ( (_, el) => $(el).data('cid') == @cid  )
@@ -7,7 +75,7 @@ class @FormbuilderModel extends Backbone.DeepModel
     Formbuilder.inputFields[@get(Formbuilder.options.mappings.FIELD_TYPE)]?
 
 
-class @FormbuilderCollection extends Backbone.Collection
+class FormbuilderCollection extends Backbone.Collection
   initialize: ->
     @on 'add', @copyCidToModel
 
@@ -20,7 +88,7 @@ class @FormbuilderCollection extends Backbone.Collection
     model.attributes.cid = model.cid
 
 
-class @ViewFieldView extends Backbone.View
+class ViewFieldView extends Backbone.View
   className: "fb-field-wrapper"
 
   events:
@@ -54,7 +122,7 @@ class @ViewFieldView extends Backbone.View
     @parentView.createField attrs, { position: @model.indexInDOM() + 1 }
 
 
-class @EditFieldView extends Backbone.View
+class EditFieldView extends Backbone.View
   className: "edit-response-field"
 
   events:
@@ -114,7 +182,7 @@ class @EditFieldView extends Backbone.View
     @model.trigger('change')
 
 
-class @BuilderView extends Backbone.View
+class Formbuilder.BuilderView extends Backbone.View
   SUBVIEWS: []
 
   events:
@@ -122,30 +190,25 @@ class @BuilderView extends Backbone.View
     'click .fb-tabs a': 'showTab'
     'click .fb-add-field-types a': 'addField'
 
-  initialize: (options) ->
-    {selector, @formBuilder, @bootstrapData} = options
+  options:
+    autosave: false
 
-    # This is a terrible idea because it's not scoped to this view.
-    if selector?
-      @setElement $(selector)
-
+  initialize: ->
     # Create the collection, and bind the appropriate events
     @collection = new FormbuilderCollection
+
+    @collection.reset(@options.bootstrapData)
+
     @collection.bind 'add', @addOne, @
     @collection.bind 'reset', @reset, @
     @collection.bind 'change', @handleFormUpdate, @
     @collection.bind 'destroy add reset', @hideShowNoResponseFields, @
     @collection.bind 'destroy', @ensureEditViewScrolled, @
 
-    @render()
-    @collection.reset(@bootstrapData)
-    @initAutosave()
+    @formSaved = true
 
   initAutosave: ->
-    @formSaved = true
-    @saveFormButton = @$el.find(".js-save-form")
-    @saveFormButton.attr('disabled', true).text(Formbuilder.options.dict.ALL_CHANGES_SAVED)
-
+    
     setInterval =>
       @saveForm.call(@)
     , 5000
@@ -161,14 +224,20 @@ class @BuilderView extends Backbone.View
     @$el.html Formbuilder.templates['page']()
 
     # Save jQuery objects for easy use
-    @$fbLeft = @$el.find('.fb-left')
-    @$responseFields = @$el.find('.fb-response-fields')
+    @$saveFormButton = @$(".js-save-form")
+    @$fbLeft = @$('.fb-left')
+    @$responseFields = @$('.fb-response-fields')
+
+    @$saveFormButton.attr('disabled', true).text(Formbuilder.options.dict.ALL_CHANGES_SAVED)
 
     @bindWindowScrollEvent()
     @hideShowNoResponseFields()
+    @setSortable()
 
     # Render any subviews (this is an easy way of extending the Formbuilder)
     new subview({parentView: @}).render() for subview in @SUBVIEWS
+
+    @initAutosave() if @options.autosave
 
     return @
 
@@ -253,7 +322,6 @@ class @BuilderView extends Backbone.View
 
   addAll: ->
     @collection.each @addOne, @
-    @setSortable()
 
   hideShowNoResponseFields: ->
     @$el.find(".fb-no-response-fields")[if @collection.length > 0 then 'hide' else 'show']()
@@ -309,17 +377,17 @@ class @BuilderView extends Backbone.View
   handleFormUpdate: ->
     return if @updatingBatch
     @formSaved = false
-    @saveFormButton.removeAttr('disabled').text(Formbuilder.options.dict.SAVE_FORM)
+    @$saveFormButton.removeAttr('disabled').text(Formbuilder.options.dict.SAVE_FORM)
 
   saveForm: (e) ->
     return if @formSaved
     @formSaved = true
-    @saveFormButton.attr('disabled', true).text(Formbuilder.options.dict.ALL_CHANGES_SAVED)
+    @$saveFormButton.attr('disabled', true).text(Formbuilder.options.dict.ALL_CHANGES_SAVED)
     @collection.sort()
-    payload = JSON.stringify fields: @collection.toJSON()
+    payload = { fields: @collection.toJSON() }
 
-    if Formbuilder.options.HTTP_ENDPOINT then @doAjaxSave(payload)
-    @formBuilder.trigger 'save', payload
+    if Formbuilder.options.HTTP_ENDPOINT then @doAjaxSave(JSON.stringify payload)
+    @trigger 'save', payload
 
   doAjaxSave: (payload) ->
     $.ajax
@@ -337,74 +405,7 @@ class @BuilderView extends Backbone.View
 
         @updatingBatch = undefined
 
-
-class @Formbuilder
-  @helpers:
-    defaultFieldAttrs: (field_type) ->
-      attrs =
-        label: "Untitled"
-        field_type: field_type
-        required: true
-        field_options: {}
-
-      Formbuilder.fields[field_type].defaultAttributes?(attrs) || attrs
-
-    simple_format: (x) ->
-      x?.replace(/\n/g, '<br />')
-
-  @options:
-    BUTTON_CLASS: 'fb-button'
-    HTTP_ENDPOINT: ''
-    HTTP_METHOD: 'POST'
-
-    mappings:
-      SIZE: 'field_options.size'
-      UNITS: 'field_options.units'
-      LABEL: 'label'
-      FIELD_TYPE: 'field_type'
-      REQUIRED: 'required'
-      ADMIN_ONLY: 'admin_only'
-      OPTIONS: 'field_options.options'
-      DESCRIPTION: 'field_options.description'
-      INCLUDE_OTHER: 'field_options.include_other_option'
-      INCLUDE_BLANK: 'field_options.include_blank_option'
-      INTEGER_ONLY: 'field_options.integer_only'
-      MIN: 'field_options.min'
-      MAX: 'field_options.max'
-      MINLENGTH: 'field_options.minlength'
-      MAXLENGTH: 'field_options.maxlength'
-      LENGTH_UNITS: 'field_options.min_max_length_units'
-
-    dict:
-      ALL_CHANGES_SAVED: 'All changes saved'
-      SAVE_FORM: 'Save form'
-      UNSAVED_CHANGES: 'You have unsaved changes. If you leave this page, you will lose those changes!'
-
-  @fields: {}
-  @inputFields: {}
-  @nonInputFields: {}
-
-  @registerField: (name, opts) ->
-    for x in ['view', 'edit']
-      opts[x] = _.template(opts[x])
-
-    opts.field_type = name
-
-    Formbuilder.fields[name] = opts
-
-    if opts.type == 'non_input'
-      Formbuilder.nonInputFields[name] = opts
-    else
-      Formbuilder.inputFields[name] = opts
-
-  constructor: (opts={}) ->
-    _.extend @, Backbone.Events
-    args = _.extend opts, {formBuilder: @}
-    @mainView = new BuilderView args
-
-#window.Formbuilder = Formbuilder
-
-#if module?
-#  module.exports = Formbuilder
-#else
-#  window.Formbuilder = Formbuilder
+if module?
+  module.exports = Formbuilder
+else
+  window.Formbuilder = Formbuilder

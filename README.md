@@ -9,11 +9,18 @@ Formbuilder is a graphical interface for letting users build their own webforms.
 [Click here](http://dobtco.github.io/formbuilder/) to see Formbuilder in action.
 
 ## Basic usage
-```
+```html
 <div id='formbuilder'></div>
 
 <script>
+// Simple
 var formbuilder = new Formbuilder('#formbuilder');
+// Better
+var formbuilder = new Formbuilder.BuilderView(el: '#formbuilder').render();
+
+formbuilder.on('save', function(data){
+  console.log('I want to save', data);
+});
 </script>
 ```
 
