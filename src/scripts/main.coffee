@@ -385,6 +385,7 @@ class Formbuilder.BuilderView extends Backbone.View
     return if @updatingBatch
     @formSaved = false
     @$saveFormButton.removeAttr('disabled').text(Formbuilder.options.dict.SAVE_FORM)
+    @trigger 'change'
 
   saveForm: (e) ->
     return if @formSaved
