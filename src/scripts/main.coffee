@@ -87,6 +87,10 @@ class FormbuilderCollection extends Backbone.Collection
   copyCidToModel: (model) ->
     model.attributes.cid = model.cid
 
+  toJSON: ->
+    @sort() # is this necessary?
+    super
+
 
 class ViewFieldView extends Backbone.View
   className: "fb-field-wrapper"
@@ -217,7 +221,7 @@ class Formbuilder.BuilderView extends Backbone.View
       if @formSaved then undefined else Formbuilder.options.dict.UNSAVED_CHANGES
 
   reset: ->
-    @$responseFields.html('')
+    @$responseFields?.html('')
     @addAll()
 
   render: ->
@@ -233,6 +237,8 @@ class Formbuilder.BuilderView extends Backbone.View
     @bindWindowScrollEvent()
     @hideShowNoResponseFields()
     @setSortable()
+
+    @addAll()
 
     # Render any subviews (this is an easy way of extending the Formbuilder)
     new subview({parentView: @}).render() for subview in @SUBVIEWS
@@ -266,28 +272,29 @@ class Formbuilder.BuilderView extends Backbone.View
       model: responseField
       parentView: @
 
-    #####
-    # Calculates where to place this new field.
-    #
-    # Are we replacing a temporarily drag placeholder?
-    if options.$replaceEl?
-      options.$replaceEl.replaceWith(view.render().el)
+    if @$responseFields
+      #####
+      # Calculates where to place this new field.
+      #
+      # Are we replacing a temporarily drag placeholder?
+      if options.$replaceEl?
+        options.$replaceEl.replaceWith(view.render().el)
 
-    # Are we adding to the bottom?
-    else if !options.position? || options.position == -1
-      @$responseFields.append view.render().el
+      # Are we adding to the bottom?
+      else if !options.position? || options.position == -1
+        @$responseFields.append view.render().el
 
-    # Are we adding to the top?
-    else if options.position == 0
-      @$responseFields.prepend view.render().el
+      # Are we adding to the top?
+      else if options.position == 0
+        @$responseFields.prepend view.render().el
 
-    # Are we adding below an existing field?
-    else if ($replacePosition = @$responseFields.find(".fb-field-wrapper").eq(options.position))[0]
-      $replacePosition.before view.render().el
+      # Are we adding below an existing field?
+      else if ($replacePosition = @$responseFields.find(".fb-field-wrapper").eq(options.position))[0]
+        $replacePosition.before view.render().el
 
-    # Catch-all: add to bottom
-    else
-      @$responseFields.append view.render().el
+      # Catch-all: add to bottom
+      else
+        @$responseFields.append view.render().el
 
   setSortable: ->
     @$responseFields.sortable('destroy') if @$responseFields.hasClass('ui-sortable')
@@ -383,10 +390,9 @@ class Formbuilder.BuilderView extends Backbone.View
     return if @formSaved
     @formSaved = true
     @$saveFormButton.attr('disabled', true).text(Formbuilder.options.dict.ALL_CHANGES_SAVED)
-    @collection.sort()
-    payload = { fields: @collection.toJSON() }
 
-    if Formbuilder.options.HTTP_ENDPOINT then @doAjaxSave(JSON.stringify payload)
+    payload = @collection.toJSON()
+    if Formbuilder.options.HTTP_ENDPOINT then @doAjaxSave(JSON.stringify({ fields: payload }))
     @trigger 'save', payload
 
   doAjaxSave: (payload) ->
