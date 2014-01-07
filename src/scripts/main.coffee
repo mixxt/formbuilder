@@ -412,6 +412,8 @@ class Formbuilder.BuilderView extends Backbone.View
 
         @updatingBatch = undefined
 
+Formbuilder.Model = FormbuilderModel
+
 if module?
   module.exports = Formbuilder
 else
