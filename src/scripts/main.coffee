@@ -11,6 +11,9 @@ class Formbuilder
 
       Formbuilder.fields[field_type].defaultAttributes?(attrs) || attrs
 
+    defaultOptionAttrs: (field_type)->
+      { checked: false, label: '' }
+
     simple_format: (x) ->
       x?.replace(/\n/g, '<br />')
 
@@ -132,12 +135,12 @@ class EditFieldView extends Backbone.View
   events:
     'click .js-add-option': 'addOption'
     'click .js-remove-option': 'removeOption'
-    'click .js-default-updated': 'defaultUpdated'
-    'input .option-label-input': 'forceRender'
+    'input .option-label-input': 'triggerChange'
+    'input .option-value-input': 'triggerChange'
 
   initialize: (options) ->
     {@parentView} = options
-    @listenTo @model, "destroy", @remove
+    @listenTo @model, 'destroy', @remove
 
   render: ->
     @$el.html(Formbuilder.templates["edit/base#{if !@model.is_input() then '_non_input' else ''}"]({rf: @model}))
@@ -146,45 +149,33 @@ class EditFieldView extends Backbone.View
 
   remove: ->
     @parentView.editView = undefined
-    @parentView.$el.find("[data-target=\"#addField\"]").click()
+    @parentView.$el.find('[data-target="#addField"]').click()
     super
 
-  # @todo this should really be on the model, not the view
   addOption: (e) ->
     $el = $(e.currentTarget)
-    i = @$el.find('.option').index($el.closest('.option'))
-    options = @model.get(Formbuilder.options.mappings.OPTIONS) || []
-    newOption = {label: "", checked: false}
 
+    options = _.clone(@model.get(Formbuilder.options.mappings.OPTIONS))
+    newOption = Formbuilder.helpers.defaultOptionAttrs(@model.get(Formbuilder.options.mappings.FIELD_TYPE))
+    debug "add option", newOption
+
+    i = @$el.find('.option').index($el.closest('.option'))
     if i > -1
       options.splice(i + 1, 0, newOption)
     else
       options.push newOption
 
-    @model.set Formbuilder.options.mappings.OPTIONS, options
-    @model.trigger "change:#{Formbuilder.options.mappings.OPTIONS}"
-    @forceRender()
+    @model.set(Formbuilder.options.mappings.OPTIONS, options)
 
   removeOption: (e) ->
     $el = $(e.currentTarget)
-    index = @$el.find(".js-remove-option").index($el)
-    options = @model.get Formbuilder.options.mappings.OPTIONS
+    index = @$el.find('.js-remove-option').index($el)
+    options = _.clone(@model.get(Formbuilder.options.mappings.OPTIONS))
     options.splice index, 1
-    @model.set Formbuilder.options.mappings.OPTIONS, options
-    @model.trigger "change:#{Formbuilder.options.mappings.OPTIONS}"
-    @forceRender()
+    @model.set(Formbuilder.options.mappings.OPTIONS, options)
 
-  defaultUpdated: (e) ->
-    $el = $(e.currentTarget)
-
-    unless @model.get(Formbuilder.options.mappings.FIELD_TYPE) == 'checkboxes' # checkboxes can have multiple options selected
-      @$el.find(".js-default-updated").not($el).attr('checked', false).trigger('change')
-
-    @forceRender()
-
-  forceRender: ->
+  triggerChange: =>
     @model.trigger('change')
-
 
 class Formbuilder.BuilderView extends Backbone.View
   SUBVIEWS: []
