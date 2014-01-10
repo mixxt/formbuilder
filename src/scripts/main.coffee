@@ -159,7 +159,6 @@ class EditFieldView extends Backbone.View
 
     options = _.clone(@model.get(Formbuilder.options.mappings.OPTIONS))
     newOption = Formbuilder.helpers.defaultOptionAttrs(@model.get(Formbuilder.options.mappings.FIELD_TYPE))
-    debug "add option", newOption
 
     i = @$el.find('.option').index($el.closest('.option'))
     if i > -1
