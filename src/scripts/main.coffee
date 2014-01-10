@@ -145,6 +145,8 @@ class EditFieldView extends Backbone.View
   render: ->
     @$el.html(Formbuilder.templates["edit/base#{if !@model.is_input() then '_non_input' else ''}"]({rf: @model}))
     rivets.bind @$el, { model: @model }
+    # Custom element hook to trigger something after render
+    Formbuilder.fields[@model.get(Formbuilder.options.mappings.FIELD_TYPE)].afterRenderEditView?.call(@)
     return @
 
   remove: ->
